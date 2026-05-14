@@ -18,7 +18,7 @@ class ModelRecord:
 class ModelRegistry:
     def __init__(self):
         config.REGISTRY_PATH.parent.mkdir(parents=True, exist_ok=True)
-        self._conn = sqlite3.connect(str(config.REGISTRY_PATH))
+        self._conn = sqlite3.connect(str(config.REGISTRY_PATH), check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
         self._create_table()
 
