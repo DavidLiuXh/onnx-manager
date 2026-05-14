@@ -2,6 +2,8 @@
 
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
+[中文文档](README_cn.md)
+
 A local ONNX model management and serving tool for AI developers.
 
 ## Overview
