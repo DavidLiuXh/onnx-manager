@@ -1,6 +1,5 @@
 import click
 from onnx_manager.cli.client import DaemonClient
-import onnx_manager.config as config
 
 
 @click.command("run")

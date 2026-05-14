@@ -57,8 +57,8 @@ def ps_cmd(port):
     """Show models currently loaded in memory."""
     client = DaemonClient(port=port)
     if not client.is_alive():
-        click.echo("Daemon is not running. Run: onnx serve")
-        return
+        click.echo("Daemon is not running. Run: onnx serve", err=True)
+        raise SystemExit(1)
     loaded = client.list_loaded()
     if not loaded:
         click.echo("No models loaded.")

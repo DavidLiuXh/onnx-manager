@@ -71,6 +71,7 @@ def test_rm_nonexistent_model():
         result = runner.invoke(cli, ["rm", "nonexistent"])
 
     assert result.exit_code != 0
+    # Explicitly check stderr output
     assert "not found" in result.output.lower()
 
 
