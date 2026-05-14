@@ -29,10 +29,8 @@ async def get_model(model_id: str, request: Request):
 async def load_model(model_id: str, request: Request):
     pool = request.app.state.pool
     registry = request.app.state.registry
-    record = registry.get(model_id)
-    if record is None:
-        raise HTTPException(status_code=404, detail=f"Model {model_id!r} not found")
-    pool.load(record)
+    from onnx_manager.daemon.routes import _get_or_load_session
+    _get_or_load_session(model_id, pool, registry)
     return {"id": model_id, "status": "loaded"}
 
 

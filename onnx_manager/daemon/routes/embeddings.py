@@ -17,6 +17,7 @@ class EmbeddingRequest(BaseModel):
 async def create_embeddings(req: EmbeddingRequest, request: Request):
     pool = request.app.state.pool
     registry = request.app.state.registry
+    already_loaded = pool.get(req.model) is not None
     t0 = time.monotonic()
     session = _get_or_load_session(req.model, pool, registry)
     load_ms = int((time.monotonic() - t0) * 1000)
@@ -25,6 +26,7 @@ async def create_embeddings(req: EmbeddingRequest, request: Request):
     backend = EmbeddingBackend(session)
     vectors = backend.run(texts)
 
+    # Approximate token count (word-based, not subword)
     total_tokens = sum(len(t.split()) for t in texts)
     body = {
         "object": "list",
@@ -35,5 +37,5 @@ async def create_embeddings(req: EmbeddingRequest, request: Request):
         "model": req.model,
         "usage": {"prompt_tokens": total_tokens, "total_tokens": total_tokens},
     }
-    headers = {"X-Model-Load-Time-Ms": str(load_ms)} if load_ms > 10 else {}
+    headers = {} if already_loaded else {"X-Model-Load-Time-Ms": str(load_ms)}
     return JSONResponse(content=body, headers=headers)

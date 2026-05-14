@@ -22,6 +22,8 @@ def _get_or_load_session(model_id: str, pool: ModelPool, registry: ModelRegistry
             status_code=503,
             detail=f"Out of memory. Currently loaded: [{ids}]. Try: onnx unload <model>",
         )
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=500,

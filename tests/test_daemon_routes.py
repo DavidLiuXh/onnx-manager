@@ -96,3 +96,13 @@ def test_model_not_found(tmp_onnx_home, app):
         "input": "test",
     })
     assert resp.status_code == 404
+
+
+def test_completions_stream_not_supported(tmp_onnx_home, app):
+    client = TestClient(app)
+    resp = client.post("/v1/completions", json={
+        "model": "microsoft/phi-3-mini",
+        "prompt": "Hello",
+        "stream": True,
+    })
+    assert resp.status_code == 501
