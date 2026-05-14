@@ -1,0 +1,48 @@
+import shutil
+import pytest
+from pathlib import Path
+from unittest.mock import patch, MagicMock
+from onnx_manager.store.downloader import (
+    model_id_to_dirname,
+    detect_task_from_pipeline_tag,
+    import_local_model,
+)
+from onnx_manager.store.registry import ModelRegistry
+
+
+def test_model_id_to_dirname():
+    assert model_id_to_dirname("BAAI/bge-small-en-v1.5") == "BAAI--bge-small-en-v1.5"
+    assert model_id_to_dirname("mymodel") == "mymodel"
+
+
+def test_detect_task_from_pipeline_tag():
+    assert detect_task_from_pipeline_tag("feature-extraction") == "embedding"
+    assert detect_task_from_pipeline_tag("sentence-similarity") == "embedding"
+    assert detect_task_from_pipeline_tag("text-ranking") == "rerank"
+    assert detect_task_from_pipeline_tag("text-generation") == "text-generation"
+    assert detect_task_from_pipeline_tag("unknown-tag") is None
+
+
+def test_import_local_model(tmp_onnx_home, tmp_path):
+    # Create a fake onnx file and tokenizer
+    fake_model = tmp_path / "model.onnx"
+    fake_model.write_bytes(b"fake-onnx-bytes")
+    fake_tokenizer = tmp_path / "tokenizer.json"
+    fake_tokenizer.write_text('{"version": "1.0"}')
+
+    with patch("onnx_manager.store.downloader.onnx.checker.check_model"):
+        reg = ModelRegistry()
+        record = import_local_model(
+            onnx_path=fake_model,
+            name="mymodel",
+            task="embedding",
+            registry=reg,
+        )
+
+    assert record.id == "mymodel"
+    assert record.task == "embedding"
+    assert record.source == "local"
+    dest_dir = tmp_onnx_home / "models" / "mymodel"
+    assert (dest_dir / "model.onnx").exists()
+    assert (dest_dir / "tokenizer.json").exists()
+    assert reg.get("mymodel") is not None

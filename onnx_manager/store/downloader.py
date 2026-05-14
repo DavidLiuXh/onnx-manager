@@ -1,0 +1,113 @@
+import shutil
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Optional
+
+import onnx
+from huggingface_hub import hf_hub_download
+from huggingface_hub.utils import EntryNotFoundError
+
+import onnx_manager.config as config
+from onnx_manager.store.registry import ModelRecord, ModelRegistry
+
+
+def model_id_to_dirname(model_id: str) -> str:
+    return model_id.replace("/", "--")
+
+
+def detect_task_from_pipeline_tag(pipeline_tag: str) -> Optional[str]:
+    return config.PIPELINE_TAG_MAP.get(pipeline_tag)
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
+
+
+def pull_from_huggingface(model_id: str, registry: ModelRegistry) -> ModelRecord:
+    from huggingface_hub import model_info as hf_model_info
+
+    info = hf_model_info(model_id)
+    pipeline_tag = getattr(info, "pipeline_tag", None) or ""
+    task = detect_task_from_pipeline_tag(pipeline_tag)
+    if task is None:
+        raise ValueError(
+            f"Cannot detect task for pipeline_tag={pipeline_tag!r}. "
+            f"Supported: {list(config.PIPELINE_TAG_MAP.keys())}"
+        )
+
+    dirname = model_id_to_dirname(model_id)
+    dest_dir = config.MODELS_DIR / dirname
+    dest_dir.mkdir(parents=True, exist_ok=True)
+
+    # Download model.onnx (try onnx/ subfolder first, then root)
+    try:
+        local_onnx = hf_hub_download(
+            repo_id=model_id, filename="onnx/model.onnx", local_dir=str(dest_dir)
+        )
+        onnx_src = Path(local_onnx)
+        onnx_dest = dest_dir / "model.onnx"
+        if onnx_src != onnx_dest:
+            shutil.move(str(onnx_src), str(onnx_dest))
+            try:
+                onnx_src.parent.rmdir()
+            except OSError:
+                pass
+    except EntryNotFoundError:
+        hf_hub_download(
+            repo_id=model_id, filename="model.onnx", local_dir=str(dest_dir)
+        )
+
+    # Download tokenizer files (best effort)
+    for fname in ("tokenizer.json", "tokenizer_config.json"):
+        try:
+            hf_hub_download(repo_id=model_id, filename=fname, local_dir=str(dest_dir))
+        except EntryNotFoundError:
+            pass
+
+    size_bytes = (dest_dir / "model.onnx").stat().st_size
+    record = ModelRecord(
+        id=model_id,
+        name=model_id.split("/")[-1],
+        task=task,
+        source="huggingface",
+        local_path=str(dest_dir),
+        size_bytes=size_bytes,
+        pulled_at=_now_iso(),
+    )
+    registry.add(record)
+    return record
+
+
+def import_local_model(
+    onnx_path: Path,
+    name: str,
+    task: str,
+    registry: ModelRegistry,
+) -> ModelRecord:
+    onnx.checker.check_model(str(onnx_path))
+
+    dest_dir = config.MODELS_DIR / name
+    dest_dir.mkdir(parents=True, exist_ok=True)
+
+    dest_onnx = dest_dir / "model.onnx"
+    shutil.copy2(str(onnx_path), str(dest_onnx))
+
+    # Copy tokenizer files from same directory if present
+    src_dir = onnx_path.parent
+    for fname in ("tokenizer.json", "tokenizer_config.json"):
+        src = src_dir / fname
+        if src.exists():
+            shutil.copy2(str(src), str(dest_dir / fname))
+
+    size_bytes = dest_onnx.stat().st_size
+    record = ModelRecord(
+        id=name,
+        name=name,
+        task=task,
+        source="local",
+        local_path=str(dest_dir),
+        size_bytes=size_bytes,
+        pulled_at=_now_iso(),
+    )
+    registry.add(record)
+    return record
