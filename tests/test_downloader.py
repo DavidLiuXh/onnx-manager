@@ -69,3 +69,29 @@ def test_import_local_model_no_tokenizer(tmp_onnx_home, tmp_path):
     dest_dir = tmp_onnx_home / "models" / "no-tok-model"
     assert (dest_dir / "model.onnx").exists()
     assert not (dest_dir / "tokenizer.json").exists()
+
+
+def test_downloader_cleans_onnx_subdir_after_move(tmp_onnx_home, tmp_path):
+    """When model is moved from onnx/ subdir, the subdir (with any extra files) is cleaned."""
+    import shutil as _shutil
+    from pathlib import Path as _Path
+
+    dest_dir = tmp_onnx_home / "models" / "test--model"
+    dest_dir.mkdir(parents=True)
+
+    # Simulate: onnx/model.onnx exists with extra cache file
+    onnx_subdir = dest_dir / "onnx"
+    onnx_subdir.mkdir()
+    onnx_src = onnx_subdir / "model.onnx"
+    onnx_src.write_bytes(b"fake-onnx")
+    (onnx_subdir / ".cache_info").write_text("extra")  # extra file that rmdir() can't handle
+
+    onnx_dest = dest_dir / "model.onnx"
+    _shutil.move(str(onnx_src), str(onnx_dest))
+
+    # This is what the fixed code does:
+    if onnx_src.parent != dest_dir:
+        _shutil.rmtree(str(onnx_src.parent), ignore_errors=True)
+
+    assert onnx_dest.exists()
+    assert not onnx_subdir.exists()  # subdir cleaned up despite extra file

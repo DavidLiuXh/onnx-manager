@@ -48,10 +48,8 @@ def pull_from_huggingface(model_id: str, registry: ModelRegistry) -> ModelRecord
         onnx_dest = dest_dir / "model.onnx"
         if onnx_src != onnx_dest:
             shutil.move(str(onnx_src), str(onnx_dest))
-            try:
-                onnx_src.parent.rmdir()
-            except OSError:
-                pass
+            if onnx_src.parent != dest_dir:  # only remove if it's a subdirectory
+                shutil.rmtree(str(onnx_src.parent), ignore_errors=True)
     except EntryNotFoundError:
         hf_hub_download(
             repo_id=model_id, filename="model.onnx", local_dir=str(dest_dir)
