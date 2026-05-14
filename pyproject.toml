@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "onnx-manager"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "click>=8.1",
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "onnxruntime>=1.17",
+    "onnx>=1.16",
+    "tokenizers>=0.19",
+    "huggingface-hub>=0.22",
+    "httpx>=0.27",
+    "numpy>=1.26",
+    "scipy>=1.12",
+]
+
+[project.scripts]
+onnx = "onnx_manager.cli.main:cli"
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-asyncio>=0.23", "httpx>=0.27"]

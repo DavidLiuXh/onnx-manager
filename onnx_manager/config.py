@@ -1,0 +1,16 @@
+from pathlib import Path
+
+ONNX_HOME = Path.home() / ".onnx"
+MODELS_DIR = ONNX_HOME / "models"
+REGISTRY_PATH = ONNX_HOME / "registry.db"
+PID_FILE = ONNX_HOME / "daemon.pid"
+LOG_FILE = ONNX_HOME / "daemon.log"
+DEFAULT_PORT = 11434
+DEFAULT_HOST = "127.0.0.1"
+TASK_TYPES = ("embedding", "rerank", "text-generation")
+PIPELINE_TAG_MAP = {
+    "feature-extraction": "embedding",
+    "sentence-similarity": "embedding",
+    "text-ranking": "rerank",
+    "text-generation": "text-generation",
+}
