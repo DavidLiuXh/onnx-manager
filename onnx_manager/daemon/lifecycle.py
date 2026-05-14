@@ -25,7 +25,7 @@ def read_pid(pid_file: Path = None) -> int | None:
         return None
     try:
         return int(pid_file.read_text().strip())
-    except ValueError:
+    except (ValueError, OSError):
         return None
 
 
@@ -33,8 +33,10 @@ def is_running(pid: int) -> bool:
     try:
         os.kill(pid, 0)
         return True
-    except (ProcessLookupError, PermissionError):
+    except ProcessLookupError:
         return False
+    except PermissionError:
+        return True  # process exists but we don't own it
 
 
 def cleanup_stale_pid(pid_file: Path = None) -> None:
