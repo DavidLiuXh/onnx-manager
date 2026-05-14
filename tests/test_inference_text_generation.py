@@ -30,3 +30,18 @@ def test_text_generation_returns_string():
     backend = TextGenerationBackend(session)
     result = backend.run(prompt="Hello", max_tokens=3)
     assert isinstance(result, str)
+
+
+def test_text_generation_stops_at_eos():
+    session = _make_session(vocab_size=100)
+    # token_to_id("</s>") returns 2 (EOS), force next token = 2 immediately
+    logits_eos = np.zeros((1, 3, 100), dtype=np.float32)
+    logits_eos[0, -1, 2] = 10.0  # force EOS token
+    session.ort_session.run.return_value = [logits_eos]
+
+    backend = TextGenerationBackend(session)
+    result = backend.run(prompt="Hello", max_tokens=10)
+    # should stop immediately, returning empty decoded string
+    assert isinstance(result, str)
+    # verify ort_session.run was called only once (stopped after first token = EOS)
+    assert session.ort_session.run.call_count == 1
