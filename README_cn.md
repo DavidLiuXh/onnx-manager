@@ -1,5 +1,7 @@
 # onnx-manager
 
+[English](README.md)
+
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
 面向 AI 开发者的本地 ONNX 模型管理与推理服务工具。
