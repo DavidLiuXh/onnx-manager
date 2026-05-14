@@ -4,6 +4,10 @@ from onnx_manager.inference.base import InferenceBackend
 
 class TextGenerationBackend(InferenceBackend):
     def run(self, prompt: str, max_tokens: int = 100) -> str:
+        if self.session.tokenizer is None:
+            raise ValueError(
+                "This model has no tokenizer. Ensure tokenizer.json is present in the model directory."
+            )
         enc = self.session.tokenizer.encode(prompt)
         input_ids = enc.ids[:]
         eos_id_raw = self.session.tokenizer.token_to_id("</s>")

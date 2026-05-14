@@ -4,6 +4,10 @@ from onnx_manager.inference.base import InferenceBackend
 
 class EmbeddingBackend(InferenceBackend):
     def run(self, texts: list[str]) -> list[list[float]]:
+        if self.session.tokenizer is None:
+            raise ValueError(
+                "This model has no tokenizer. Ensure tokenizer.json is present in the model directory."
+            )
         input_names = [i.name for i in self.session.ort_session.get_inputs()]
         results = []
         for text in texts:

@@ -40,3 +40,11 @@ def test_embed_batch():
     backend = EmbeddingBackend(session)
     result = backend.run(["text one", "text two"])
     assert len(result) == 2
+
+
+def test_embed_raises_without_tokenizer():
+    session = MagicMock()
+    session.tokenizer = None
+    backend = EmbeddingBackend(session)
+    with pytest.raises(ValueError, match="tokenizer"):
+        backend.run(["hello"])

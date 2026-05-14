@@ -5,6 +5,10 @@ from onnx_manager.inference.base import InferenceBackend
 
 class RerankBackend(InferenceBackend):
     def run(self, query: str, documents: list[str]) -> list[float]:
+        if self.session.tokenizer is None:
+            raise ValueError(
+                "This model has no tokenizer. Ensure tokenizer.json is present in the model directory."
+            )
         input_names = [i.name for i in self.session.ort_session.get_inputs()]
         scores = []
         for doc in documents:

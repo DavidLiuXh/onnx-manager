@@ -1,5 +1,4 @@
 import click
-import onnx_manager.config as config
 from onnx_manager.daemon.lifecycle import run_daemon
 
 
