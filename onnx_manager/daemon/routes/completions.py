@@ -1,3 +1,5 @@
+import asyncio
+import functools
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from typing import Optional
@@ -24,7 +26,11 @@ async def create_completion(req: CompletionRequest, request: Request):
     session = _get_or_load_session(req.model, pool, registry)
 
     backend = TextGenerationBackend(session)
-    text = backend.run(prompt=req.prompt, max_tokens=req.max_tokens)
+    loop = asyncio.get_event_loop()
+    text = await loop.run_in_executor(
+        None,
+        functools.partial(backend.run, prompt=req.prompt, max_tokens=req.max_tokens)
+    )
 
     return {
         "id": "cmpl-local",

@@ -1,3 +1,5 @@
+import asyncio
+import functools
 import time
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
@@ -24,7 +26,8 @@ async def create_embeddings(req: EmbeddingRequest, request: Request):
 
     texts = [req.input] if isinstance(req.input, str) else req.input
     backend = EmbeddingBackend(session)
-    vectors = backend.run(texts)
+    loop = asyncio.get_event_loop()
+    vectors = await loop.run_in_executor(None, backend.run, texts)
 
     # Approximate token count (word-based, not subword)
     total_tokens = sum(len(t.split()) for t in texts)
