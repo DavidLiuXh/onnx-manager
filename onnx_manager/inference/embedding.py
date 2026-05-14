@@ -17,6 +17,8 @@ class EmbeddingBackend(InferenceBackend):
                 feeds["input_ids"] = np.array([enc.ids], dtype=np.int64)
             if "attention_mask" in input_names:
                 feeds["attention_mask"] = np.array([enc.attention_mask], dtype=np.int64)
+            if "token_type_ids" in input_names:
+                feeds["token_type_ids"] = np.array([[0] * len(enc.ids)], dtype=np.int64)
             output = self.session.ort_session.run(None, feeds)[0]  # (1, seq, hidden)
             vec = output[0].mean(axis=0)
             norm = np.linalg.norm(vec)

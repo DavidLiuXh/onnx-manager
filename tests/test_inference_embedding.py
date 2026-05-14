@@ -10,6 +10,7 @@ def _make_session(hidden=64):
     encoded = MagicMock()
     encoded.ids = [1, 2, 3]
     encoded.attention_mask = [1, 1, 1]
+    encoded.type_ids = [0, 0, 0]
     tokenizer.encode.return_value = encoded
 
     raw_output = np.random.rand(1, 3, hidden).astype(np.float32)
@@ -19,7 +20,9 @@ def _make_session(hidden=64):
     mock_input_ids.name = "input_ids"
     mock_attention_mask = MagicMock()
     mock_attention_mask.name = "attention_mask"
-    session.ort_session.get_inputs.return_value = [mock_input_ids, mock_attention_mask]
+    mock_token_type_ids = MagicMock()
+    mock_token_type_ids.name = "token_type_ids"
+    session.ort_session.get_inputs.return_value = [mock_input_ids, mock_attention_mask, mock_token_type_ids]
 
     session.tokenizer = tokenizer
     return session

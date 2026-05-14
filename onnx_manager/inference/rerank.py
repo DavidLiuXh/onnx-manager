@@ -12,13 +12,15 @@ class RerankBackend(InferenceBackend):
         input_names = [i.name for i in self.session.ort_session.get_inputs()]
         scores = []
         for doc in documents:
-            text = f"{query} [SEP] {doc}"
-            enc = self.session.tokenizer.encode(text)
+            # Use pair encoding so tokenizer handles [CLS]/[SEP] and segment IDs correctly
+            enc = self.session.tokenizer.encode(query, doc)
             feeds = {}
             if "input_ids" in input_names:
                 feeds["input_ids"] = np.array([enc.ids], dtype=np.int64)
             if "attention_mask" in input_names:
                 feeds["attention_mask"] = np.array([enc.attention_mask], dtype=np.int64)
+            if "token_type_ids" in input_names:
+                feeds["token_type_ids"] = np.array([enc.type_ids], dtype=np.int64)
             logits = self.session.ort_session.run(None, feeds)[0]  # (1, 2)
             probs = softmax(logits[0])
             scores.append(float(probs[-1]))
