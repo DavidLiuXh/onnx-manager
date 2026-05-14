@@ -81,3 +81,56 @@ def test_stop_no_daemon():
         result = runner.invoke(cli, ["stop"])
     assert result.exit_code == 0
     assert "not running" in result.output.lower()
+
+
+def test_run_embedding(tmp_onnx_home):
+    runner = CliRunner()
+    mock_record = MagicMock()
+    mock_record.task = "embedding"
+
+    with patch("onnx_manager.cli.commands.run.ModelRegistry") as MockReg, \
+         patch("onnx_manager.cli.commands.run.DaemonClient") as MockClient:
+        MockReg.return_value.get.return_value = mock_record
+        mock_client_inst = MockClient.return_value
+        mock_client_inst.is_alive.return_value = True
+        mock_client_inst.embed.return_value = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+        result = runner.invoke(cli, ["run", "BAAI/bge-small-en-v1.5", "hello world"])
+
+    assert result.exit_code == 0
+    assert "dim=" in result.output
+
+
+def test_run_rerank(tmp_onnx_home):
+    runner = CliRunner()
+    mock_record = MagicMock()
+    mock_record.task = "rerank"
+
+    with patch("onnx_manager.cli.commands.run.ModelRegistry") as MockReg, \
+         patch("onnx_manager.cli.commands.run.DaemonClient") as MockClient:
+        MockReg.return_value.get.return_value = mock_record
+        mock_client_inst = MockClient.return_value
+        mock_client_inst.is_alive.return_value = True
+        mock_client_inst.rerank.return_value = [{"index": 0, "score": 0.92, "document": "doc1"}]
+        result = runner.invoke(cli, [
+            "run", "cross-encoder/ms-marco", "this is a document", "--query", "what is AI"
+        ])
+
+    assert result.exit_code == 0
+    assert "0.9200" in result.output
+
+
+def test_run_text_generation(tmp_onnx_home):
+    runner = CliRunner()
+    mock_record = MagicMock()
+    mock_record.task = "text-generation"
+
+    with patch("onnx_manager.cli.commands.run.ModelRegistry") as MockReg, \
+         patch("onnx_manager.cli.commands.run.DaemonClient") as MockClient:
+        MockReg.return_value.get.return_value = mock_record
+        mock_client_inst = MockClient.return_value
+        mock_client_inst.is_alive.return_value = True
+        mock_client_inst.complete.return_value = " world"
+        result = runner.invoke(cli, ["run", "microsoft/phi-3-mini", "Hello"])
+
+    assert result.exit_code == 0
+    assert "world" in result.output

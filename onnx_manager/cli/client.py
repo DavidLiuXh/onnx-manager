@@ -36,3 +36,21 @@ class DaemonClient:
         )
         r.raise_for_status()
         return r.json()["data"][0]["embedding"]
+
+    def rerank(self, model_id: str, query: str, documents: list[str]) -> list[dict]:
+        r = httpx.post(
+            f"{self.base_url}/v1/rerank",
+            json={"model": model_id, "query": query, "documents": documents},
+            timeout=30,
+        )
+        r.raise_for_status()
+        return r.json()["results"]
+
+    def complete(self, model_id: str, prompt: str, max_tokens: int = 100) -> str:
+        r = httpx.post(
+            f"{self.base_url}/v1/completions",
+            json={"model": model_id, "prompt": prompt, "max_tokens": max_tokens},
+            timeout=60,
+        )
+        r.raise_for_status()
+        return r.json()["choices"][0]["text"]
