@@ -32,8 +32,9 @@ def test_list_all(tmp_onnx_home):
     ))
     records = reg.list_all()
     assert len(records) == 2
-    ids = {r.id for r in records}
-    assert ids == {"model-a", "model-b"}
+    # list_all() must return results sorted by pulled_at DESC
+    assert records[0].id == "model-b"  # pulled_at 10:01, newer
+    assert records[1].id == "model-a"  # pulled_at 10:00, older
 
 
 def test_delete(tmp_onnx_home):
