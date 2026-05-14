@@ -29,6 +29,8 @@ def test_import_local_model(tmp_onnx_home, tmp_path):
     fake_model.write_bytes(b"fake-onnx-bytes")
     fake_tokenizer = tmp_path / "tokenizer.json"
     fake_tokenizer.write_text('{"version": "1.0"}')
+    fake_tokenizer_config = tmp_path / "tokenizer_config.json"
+    fake_tokenizer_config.write_text('{"model_type": "bert"}')
 
     with patch("onnx_manager.store.downloader.onnx.checker.check_model"):
         reg = ModelRegistry()
@@ -45,4 +47,25 @@ def test_import_local_model(tmp_onnx_home, tmp_path):
     dest_dir = tmp_onnx_home / "models" / "mymodel"
     assert (dest_dir / "model.onnx").exists()
     assert (dest_dir / "tokenizer.json").exists()
+    assert (dest_dir / "tokenizer_config.json").exists()
     assert reg.get("mymodel") is not None
+
+
+def test_import_local_model_no_tokenizer(tmp_onnx_home, tmp_path):
+    fake_model = tmp_path / "model.onnx"
+    fake_model.write_bytes(b"fake-onnx-bytes")
+    # no tokenizer.json in the directory
+
+    with patch("onnx_manager.store.downloader.onnx.checker.check_model"):
+        reg = ModelRegistry()
+        record = import_local_model(
+            onnx_path=fake_model,
+            name="no-tok-model",
+            task="rerank",
+            registry=reg,
+        )
+
+    assert record.id == "no-tok-model"
+    dest_dir = tmp_onnx_home / "models" / "no-tok-model"
+    assert (dest_dir / "model.onnx").exists()
+    assert not (dest_dir / "tokenizer.json").exists()
