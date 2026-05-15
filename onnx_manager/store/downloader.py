@@ -47,7 +47,16 @@ def pull_from_huggingface(model_id: str, registry: ModelRegistry) -> ModelRecord
     if not onnx_files:
         onnx_files = [f for f in all_files if Path(f).name.startswith("model.onnx")]
     if not onnx_files:
-        raise ValueError(f"No model.onnx file found in repo {model_id!r}")
+        has_safetensors = any(f.endswith(".safetensors") or f.endswith(".bin") for f in all_files)
+        hint = (
+            f"\nThe repo contains PyTorch weights but no ONNX export. "
+            f"Convert it first:\n\n"
+            f"  pip install optimum[onnxruntime]\n"
+            f"  optimum-cli export onnx --model {model_id} --task text-classification ./onnx_output/\n"
+            f"  onnx pull ./onnx_output/model.onnx --name {model_id.split('/')[-1]} --task rerank"
+            if has_safetensors else ""
+        )
+        raise ValueError(f"No model.onnx file found in repo {model_id!r}.{hint}")
 
     in_subdir = any(f.startswith("onnx/") for f in onnx_files)
     tmp_subdir = dest_dir / "onnx" if in_subdir else None
