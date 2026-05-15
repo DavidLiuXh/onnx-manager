@@ -59,6 +59,15 @@ def pull_from_huggingface(model_id: str, registry: ModelRegistry) -> ModelRecord
             f"Supported: {list(config.PIPELINE_TAG_MAP.keys())}"
         )
 
+    # Fast pre-check: model card tags tell us if an ONNX export exists,
+    # avoiding a full list_repo_files() round-trip for non-ONNX repos.
+    tags = getattr(info, "tags", []) or []
+    has_pytorch = any(
+        t in tags for t in ("safetensors", "pytorch")
+    )
+    if "onnx" not in tags:
+        raise NoOnnxExportError(model_id, pipeline_tag, has_pytorch)
+
     dirname = model_id_to_dirname(model_id)
     dest_dir = config.MODELS_DIR / dirname
     dest_dir.mkdir(parents=True, exist_ok=True)
