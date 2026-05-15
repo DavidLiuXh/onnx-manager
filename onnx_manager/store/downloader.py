@@ -15,10 +15,11 @@ from onnx_manager.store.registry import ModelRecord, ModelRegistry
 
 class NoOnnxExportError(ValueError):
     """Raised when a HuggingFace repo has no ONNX export."""
-    def __init__(self, model_id: str, pipeline_tag: str, has_pytorch: bool):
+    def __init__(self, model_id: str, pipeline_tag: str, has_pytorch: bool, tags: list[str] | None = None):
         self.model_id = model_id
         self.pipeline_tag = pipeline_tag
         self.has_pytorch = has_pytorch
+        self.tags = tags or []
         optimum_task = config.PIPELINE_TAG_TO_OPTIMUM_TASK.get(pipeline_tag, "feature-extraction")
         name = model_id.split("/")[-1]
         task = config.PIPELINE_TAG_MAP.get(pipeline_tag, "embedding")
@@ -66,7 +67,7 @@ def pull_from_huggingface(model_id: str, registry: ModelRegistry) -> ModelRecord
         t in tags for t in ("safetensors", "pytorch")
     )
     if "onnx" not in tags:
-        raise NoOnnxExportError(model_id, pipeline_tag, has_pytorch)
+        raise NoOnnxExportError(model_id, pipeline_tag, has_pytorch, tags)
 
     dirname = model_id_to_dirname(model_id)
     dest_dir = config.MODELS_DIR / dirname
@@ -165,6 +166,7 @@ def convert_and_import(
     task: str,
     optimum_task: str,
     registry: ModelRegistry,
+    trust_remote_code: bool = False,
 ) -> ModelRecord:
     """Convert a HuggingFace model to ONNX via optimum-cli, then import it."""
     with tempfile.TemporaryDirectory() as tmp_dir:
@@ -172,13 +174,21 @@ def convert_and_import(
             "optimum-cli", "export", "onnx",
             "--model", model_id,
             "--task", optimum_task,
-            tmp_dir,
         ]
+        if trust_remote_code:
+            cmd.append("--trust-remote-code")
+        cmd.append(tmp_dir)
+
         try:
-            subprocess.run(cmd, check=True)
+            result = subprocess.run(cmd, check=True, capture_output=True, text=True)
         except FileNotFoundError:
             raise RuntimeError(
                 "optimum-cli not found. Install it with: pip install optimum[onnxruntime]"
+            )
+        except subprocess.CalledProcessError as e:
+            stderr = e.stderr.strip() if e.stderr else "(no stderr)"
+            raise RuntimeError(
+                f"optimum-cli failed (exit {e.returncode}):\n{stderr}"
             )
 
         onnx_path = Path(tmp_dir) / "model.onnx"

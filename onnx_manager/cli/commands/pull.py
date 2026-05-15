@@ -38,13 +38,17 @@ def pull_cmd(source, name, task, force_convert):
             click.echo(str(e))
             optimum_task = config.PIPELINE_TAG_TO_OPTIMUM_TASK.get(e.pipeline_tag, "feature-extraction")
             onnx_task = config.PIPELINE_TAG_MAP.get(e.pipeline_tag, "embedding")
+            trust_remote_code = "custom_code" in e.tags
             if not force_convert:
+                extra = " --trust-remote-code" if trust_remote_code else ""
                 if not click.confirm(
-                    f"\nConvert {source} to ONNX using optimum-cli? "
+                    f"\nConvert {source} to ONNX using optimum-cli?{extra}\n"
                     f"(requires: pip install optimum[onnxruntime])",
                     default=False,
                 ):
                     raise click.Abort()
+            if trust_remote_code:
+                click.echo("Note: model uses custom code, passing --trust-remote-code to optimum-cli.")
             click.echo(f"Converting {source} → ONNX (task={optimum_task})...")
             click.echo("This may take several minutes for large models.")
             try:
@@ -53,6 +57,7 @@ def pull_cmd(source, name, task, force_convert):
                     task=onnx_task,
                     optimum_task=optimum_task,
                     registry=registry,
+                    trust_remote_code=trust_remote_code,
                 )
             except RuntimeError as conv_err:
                 raise click.ClickException(str(conv_err))
