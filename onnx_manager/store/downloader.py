@@ -161,6 +161,16 @@ def import_local_model(
     return record
 
 
+def _find_onnx_alternatives(model_name: str, limit: int = 3) -> list[str]:
+    """Search HuggingFace for pre-converted ONNX versions of a model by name."""
+    try:
+        from huggingface_hub import list_models
+        results = list(list_models(search=model_name, filter="onnx", limit=limit))
+        return [m.id for m in results]
+    except Exception:
+        return []
+
+
 def convert_and_import(
     model_id: str,
     task: str,
@@ -187,6 +197,21 @@ def convert_and_import(
             )
         except subprocess.CalledProcessError as e:
             stderr = e.stderr.strip() if e.stderr else "(no stderr)"
+            # Detect unsupported custom architecture — suggest pre-converted alternatives
+            if "custom_onnx_configs" in stderr:
+                model_name = model_id.split("/")[-1]
+                alternatives = _find_onnx_alternatives(model_name)
+                alt_msg = ""
+                if alternatives:
+                    alt_msg = "\n\nPre-converted ONNX versions found on HuggingFace:\n" + \
+                        "\n".join(f"  onnx pull {mid}" for mid in alternatives)
+                else:
+                    alt_msg = "\n\nNo pre-converted ONNX version found on HuggingFace."
+                raise RuntimeError(
+                    f"This model uses a custom architecture that optimum-cli cannot export automatically.\n"
+                    f"See: https://huggingface.co/docs/optimum/main/en/exporters/onnx/usage_guides/export_a_model#custom-export-of-transformers-models"
+                    f"{alt_msg}"
+                )
             raise RuntimeError(
                 f"optimum-cli failed (exit {e.returncode}):\n{stderr}"
             )
