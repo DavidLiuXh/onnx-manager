@@ -1,9 +1,15 @@
 import httpx
 import onnx_manager.config as config
+from onnx_manager.daemon.lifecycle import read_daemon_info
 
 
 class DaemonClient:
     def __init__(self, host: str = None, port: int = None):
+        if host is None or port is None:
+            info = read_daemon_info()
+            if info is not None:
+                host = host or info["host"]
+                port = port or info["port"]
         self.base_url = f"http://{host or config.DEFAULT_HOST}:{port or config.DEFAULT_PORT}"
 
     def is_alive(self) -> bool:

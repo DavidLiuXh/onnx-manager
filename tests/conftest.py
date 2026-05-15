@@ -11,5 +11,6 @@ def tmp_onnx_home(tmp_path, monkeypatch):
     monkeypatch.setattr("onnx_manager.config.MODELS_DIR", home / "models")
     monkeypatch.setattr("onnx_manager.config.REGISTRY_PATH", home / "registry.db")
     monkeypatch.setattr("onnx_manager.config.PID_FILE", home / "daemon.pid")
+    monkeypatch.setattr("onnx_manager.config.DAEMON_INFO_FILE", home / "daemon.json")
     monkeypatch.setattr("onnx_manager.config.LOG_FILE", home / "daemon.log")
     return home
