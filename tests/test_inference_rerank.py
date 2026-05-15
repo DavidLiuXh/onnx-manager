@@ -48,3 +48,30 @@ def test_rerank_score_order():
     backend = RerankBackend(session)
     scores = backend.run(query="q", documents=["doc1", "doc2"])
     assert scores[1] > scores[0]
+
+
+def test_rerank_single_logit_uses_sigmoid():
+    """Models like gte-multilingual-reranker output a single logit; sigmoid maps it to [0,1]."""
+    session = _make_session()
+    # Single logit output: shape (1, 1)
+    session.ort_session.run.return_value = [np.array([[2.0]], dtype=np.float32)]
+
+    backend = RerankBackend(session)
+    scores = backend.run(query="what is AI", documents=["doc1"])
+    assert len(scores) == 1
+    # sigmoid(2.0) ≈ 0.880
+    assert abs(scores[0] - 0.8807970779778823) < 1e-5
+    assert 0.0 < scores[0] < 1.0
+
+
+def test_rerank_binary_logit_uses_softmax():
+    """Models like bge-reranker output 2 logits; softmax positive class is taken."""
+    session = _make_session()
+    # Binary output: shape (1, 2) — strongly positive
+    session.ort_session.run.return_value = [np.array([[-3.0, 3.0]], dtype=np.float32)]
+
+    backend = RerankBackend(session)
+    scores = backend.run(query="what is AI", documents=["doc1"])
+    assert len(scores) == 1
+    # softmax([-3, 3])[-1] ≈ 0.9975
+    assert scores[0] > 0.99
