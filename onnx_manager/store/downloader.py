@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Optional
 
 import onnx
-from huggingface_hub import hf_hub_download
+from huggingface_hub import hf_hub_download, list_repo_files
 from huggingface_hub.utils import EntryNotFoundError
 
 import onnx_manager.config as config
@@ -39,21 +39,31 @@ def pull_from_huggingface(model_id: str, registry: ModelRegistry) -> ModelRecord
     dest_dir = config.MODELS_DIR / dirname
     dest_dir.mkdir(parents=True, exist_ok=True)
 
-    # Download model.onnx (try onnx/ subfolder first, then root)
-    try:
-        local_onnx = hf_hub_download(
-            repo_id=model_id, filename="onnx/model.onnx", local_dir=str(dest_dir)
+    # List all repo files to find model.onnx and any external data files
+    all_files = list(list_repo_files(repo_id=model_id))
+
+    # Prefer onnx/ subfolder layout; fall back to root
+    onnx_files = [f for f in all_files if f.startswith("onnx/model.onnx")]
+    if not onnx_files:
+        onnx_files = [f for f in all_files if Path(f).name.startswith("model.onnx")]
+    if not onnx_files:
+        raise ValueError(f"No model.onnx file found in repo {model_id!r}")
+
+    in_subdir = any(f.startswith("onnx/") for f in onnx_files)
+    tmp_subdir = dest_dir / "onnx" if in_subdir else None
+
+    for filename in onnx_files:
+        local_path = hf_hub_download(
+            repo_id=model_id, filename=filename, local_dir=str(dest_dir)
         )
-        onnx_src = Path(local_onnx)
-        onnx_dest = dest_dir / "model.onnx"
-        if onnx_src != onnx_dest:
-            shutil.move(str(onnx_src), str(onnx_dest))
-            if onnx_src.parent != dest_dir:  # only remove if it's a subdirectory
-                shutil.rmtree(str(onnx_src.parent), ignore_errors=True)
-    except EntryNotFoundError:
-        hf_hub_download(
-            repo_id=model_id, filename="model.onnx", local_dir=str(dest_dir)
-        )
+        # Flatten onnx/ subdirectory into dest_dir
+        src = Path(local_path)
+        dst = dest_dir / src.name
+        if src != dst:
+            shutil.move(str(src), str(dst))
+
+    if tmp_subdir and tmp_subdir.exists():
+        shutil.rmtree(str(tmp_subdir), ignore_errors=True)
 
     # Download tokenizer files (best effort)
     for fname in ("tokenizer.json", "tokenizer_config.json"):
@@ -90,8 +100,13 @@ def import_local_model(
     dest_onnx = dest_dir / "model.onnx"
     shutil.copy2(str(onnx_path), str(dest_onnx))
 
-    # Copy tokenizer files from same directory if present
+    # Copy external data files (model.onnx_data, model.onnx_data_0, etc.)
     src_dir = onnx_path.parent
+    for data_file in src_dir.glob("model.onnx*"):
+        if data_file != onnx_path:
+            shutil.copy2(str(data_file), str(dest_dir / data_file.name))
+
+    # Copy tokenizer files from same directory if present
     for fname in ("tokenizer.json", "tokenizer_config.json"):
         src = src_dir / fname
         if src.exists():

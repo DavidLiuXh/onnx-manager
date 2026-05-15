@@ -71,6 +71,27 @@ def test_import_local_model_no_tokenizer(tmp_onnx_home, tmp_path):
     assert not (dest_dir / "tokenizer.json").exists()
 
 
+def test_import_local_model_with_external_data(tmp_onnx_home, tmp_path):
+    """import_local_model must copy model.onnx_data alongside model.onnx."""
+    fake_model = tmp_path / "model.onnx"
+    fake_model.write_bytes(b"fake-onnx-stub")
+    fake_data = tmp_path / "model.onnx_data"
+    fake_data.write_bytes(b"fake-weights" * 1000)
+
+    with patch("onnx_manager.store.downloader.onnx.checker.check_model"):
+        reg = ModelRegistry()
+        record = import_local_model(
+            onnx_path=fake_model,
+            name="big-model",
+            task="embedding",
+            registry=reg,
+        )
+
+    dest_dir = tmp_onnx_home / "models" / "big-model"
+    assert (dest_dir / "model.onnx").exists()
+    assert (dest_dir / "model.onnx_data").exists(), "external data file must be copied"
+
+
 def test_downloader_cleans_onnx_subdir_after_move(tmp_onnx_home, tmp_path):
     """When model is moved from onnx/ subdir, the subdir (with any extra files) is cleaned."""
     import shutil as _shutil
