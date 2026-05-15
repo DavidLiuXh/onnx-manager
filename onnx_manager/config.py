@@ -13,6 +13,7 @@ PIPELINE_TAG_MAP = {
     "feature-extraction": "embedding",
     "sentence-similarity": "embedding",
     "text-ranking": "rerank",
+    "text-classification": "rerank",
     "text-generation": "text-generation",
 }
 
@@ -21,5 +22,6 @@ PIPELINE_TAG_TO_OPTIMUM_TASK = {
     "feature-extraction": "feature-extraction",
     "sentence-similarity": "feature-extraction",
     "text-ranking": "text-classification",
+    "text-classification": "text-classification",
     "text-generation": "text-generation",
 }
