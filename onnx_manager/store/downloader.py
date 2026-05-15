@@ -1,4 +1,6 @@
 import shutil
+import subprocess
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -9,6 +11,28 @@ from huggingface_hub.utils import EntryNotFoundError
 
 import onnx_manager.config as config
 from onnx_manager.store.registry import ModelRecord, ModelRegistry
+
+
+class NoOnnxExportError(ValueError):
+    """Raised when a HuggingFace repo has no ONNX export."""
+    def __init__(self, model_id: str, pipeline_tag: str, has_pytorch: bool):
+        self.model_id = model_id
+        self.pipeline_tag = pipeline_tag
+        self.has_pytorch = has_pytorch
+        optimum_task = config.PIPELINE_TAG_TO_OPTIMUM_TASK.get(pipeline_tag, "feature-extraction")
+        name = model_id.split("/")[-1]
+        task = config.PIPELINE_TAG_MAP.get(pipeline_tag, "embedding")
+        msg = f"No ONNX export found in repo {model_id!r}."
+        if has_pytorch:
+            msg += (
+                f"\nThe repo contains PyTorch weights (pipeline_tag={pipeline_tag!r})."
+                f"\nRun `onnx pull {model_id} --convert` to convert automatically,"
+                f"\nor convert manually:\n"
+                f"  pip install optimum[onnxruntime]\n"
+                f"  optimum-cli export onnx --model {model_id} --task {optimum_task} ./onnx_output/\n"
+                f"  onnx pull ./onnx_output/model.onnx --name {name} --task {task}"
+            )
+        super().__init__(msg)
 
 
 def model_id_to_dirname(model_id: str) -> str:
@@ -47,16 +71,8 @@ def pull_from_huggingface(model_id: str, registry: ModelRegistry) -> ModelRecord
     if not onnx_files:
         onnx_files = [f for f in all_files if Path(f).name.startswith("model.onnx")]
     if not onnx_files:
-        has_safetensors = any(f.endswith(".safetensors") or f.endswith(".bin") for f in all_files)
-        hint = (
-            f"\nThe repo contains PyTorch weights but no ONNX export. "
-            f"Convert it first:\n\n"
-            f"  pip install optimum[onnxruntime]\n"
-            f"  optimum-cli export onnx --model {model_id} --task text-classification ./onnx_output/\n"
-            f"  onnx pull ./onnx_output/model.onnx --name {model_id.split('/')[-1]} --task rerank"
-            if has_safetensors else ""
-        )
-        raise ValueError(f"No model.onnx file found in repo {model_id!r}.{hint}")
+        has_pytorch = any(f.endswith(".safetensors") or f.endswith(".bin") for f in all_files)
+        raise NoOnnxExportError(model_id, pipeline_tag, has_pytorch)
 
     in_subdir = any(f.startswith("onnx/") for f in onnx_files)
     tmp_subdir = dest_dir / "onnx" if in_subdir else None
@@ -133,3 +149,52 @@ def import_local_model(
     )
     registry.add(record)
     return record
+
+
+def convert_and_import(
+    model_id: str,
+    task: str,
+    optimum_task: str,
+    registry: ModelRegistry,
+) -> ModelRecord:
+    """Convert a HuggingFace model to ONNX via optimum-cli, then import it."""
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        cmd = [
+            "optimum-cli", "export", "onnx",
+            "--model", model_id,
+            "--task", optimum_task,
+            tmp_dir,
+        ]
+        try:
+            subprocess.run(cmd, check=True)
+        except FileNotFoundError:
+            raise RuntimeError(
+                "optimum-cli not found. Install it with: pip install optimum[onnxruntime]"
+            )
+
+        onnx_path = Path(tmp_dir) / "model.onnx"
+        if not onnx_path.exists():
+            # some exports place files in a subfolder
+            candidates = list(Path(tmp_dir).glob("**/model.onnx"))
+            if not candidates:
+                raise RuntimeError(
+                    f"optimum-cli ran but produced no model.onnx in {tmp_dir}"
+                )
+            onnx_path = candidates[0]
+
+        # Use dirname as the local name so slashes don't create subdirectories,
+        # then fix the registry id back to the original model_id.
+        dirname = model_id_to_dirname(model_id)
+        record = import_local_model(
+            onnx_path=onnx_path,
+            name=dirname,
+            task=task,
+            registry=registry,
+        )
+        # Re-register under the canonical HuggingFace model_id
+        registry.delete(dirname)
+        record.id = model_id
+        record.name = model_id.split("/")[-1]
+        record.source = "huggingface"
+        registry.add(record)
+        return record

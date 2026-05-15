@@ -15,3 +15,11 @@ PIPELINE_TAG_MAP = {
     "text-ranking": "rerank",
     "text-generation": "text-generation",
 }
+
+# Maps pipeline_tag → optimum-cli --task argument for ONNX export
+PIPELINE_TAG_TO_OPTIMUM_TASK = {
+    "feature-extraction": "feature-extraction",
+    "sentence-similarity": "feature-extraction",
+    "text-ranking": "text-classification",
+    "text-generation": "text-generation",
+}
